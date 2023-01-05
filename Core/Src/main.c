@@ -22,7 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "i2c-lcd.h"
-#include "stdbool.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -91,13 +91,24 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
-
+  lcd_init();
+  int BTN1_Left = 0;
+  char BTN1_Left_str[10];
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-
+	  if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 1) {
+		  BTN1_Left += 1;
+		  sprintf(BTN1_Left_str, "%d", BTN1_Left);
+	  };
+	  lcd_put_cur(0, 0);
+	  lcd_send_string("<- Exposition ->");
+	  lcd_put_cur(1, 8);
+	  lcd_send_string(BTN1_Left_str);
+	  HAL_Delay(120);
+	  lcd_clear();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
