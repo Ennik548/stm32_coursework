@@ -93,21 +93,74 @@ int main(void)
   /* USER CODE END 2 */
   lcd_init();
   int BTN1_Left = 0;
+  int BTN3_OK = 0;
+  int EXPOSTION_TIME = 0;
   char BTN1_Left_str[10];
+  char EXPOSTION_TIME_str[4];
+  char BTN3_OK_str[10];
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
+	  /* ПЕРЕКЛЮЧЕНИЕ ПО МЕНЮ НАЧАЛО */
 	  if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 1) {
 		  BTN1_Left += 1;
-		  sprintf(BTN1_Left_str, "%d", BTN1_Left);
+	  }
+	  else if (HAL_GPIO_ReadPin(BTN2_GPIO_Port, BTN2_Pin) == 1) {
+		  BTN1_Left -= 1;
+	  }
+	  /* ПЕРЕКЛЮЧЕНИЕ ПО МЕНЮ КОНЕЦ */
+	  /* КРУГОВОЕ МЕНЮ НАЧАЛО */
+	  if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 1 && BTN1_Left == 2) {
+		  BTN1_Left = 0; // НАСТРОЙКА ПРАВОЙ ГРАНИЦЫ
 	  };
-	  lcd_put_cur(0, 0);
-	  lcd_send_string("<- Exposition ->");
-	  lcd_put_cur(1, 8);
-	  lcd_send_string(BTN1_Left_str);
-	  HAL_Delay(120);
+	  if (HAL_GPIO_ReadPin(BTN2_GPIO_Port, BTN2_Pin) == 1 && BTN1_Left == -1) {
+		  BTN1_Left = 1; // НАСТРОЙКА ЛЕВОЙ ГРАНИЦЫ
+	  };
+	  /* КРУГОВОЕ МЕНЮ КОНЕЦ */
+
+	  /* ОБРАБОТКА ОК НАЧАЛО */
+	  if (HAL_GPIO_ReadPin(BTN3_GPIO_Port, BTN3_Pin) == 1) {
+	  		  BTN3_OK += 1;
+	  };
+	  if (HAL_GPIO_ReadPin(BTN3_GPIO_Port, BTN3_Pin) == 1 && BTN3_OK == 2) {
+	  		  BTN3_OK = 0;
+	  };
+	  /* ОБРАБОТКА ОК КОНЕЦ */
+
+	  /* ИНКРЕМЕНТАЦИЯ НАЧАЛО */
+
+
+	  /* ИНКРЕМЕНТАЦИЯ КОНЕЦ */
+	  sprintf(BTN1_Left_str, "%d", BTN1_Left);
+	  sprintf(EXPOSTION_TIME_str, "%d", EXPOSTION_TIME);
+	  sprintf(BTN3_OK_str, "%d", BTN3_OK);
+
+	  /* ЭЛЕМЕНТЫ КРУГОВОГО МЕНЮ НАЧАЛО */
+	  if (BTN1_Left == 0) {
+		  lcd_put_cur(0, 0);
+		  lcd_send_string("<- Exposition ->");
+		  lcd_put_cur(1, 0);
+		  lcd_send_string(BTN3_OK_str);
+		  lcd_put_cur(1, 8);
+		  lcd_send_string(EXPOSTION_TIME_str);
+		  if (HAL_GPIO_ReadPin(BTN4_GPIO_Port, BTN4_Pin) == 1 && BTN3_OK == 1 && EXPOSTION_TIME != 9999) {
+			  EXPOSTION_TIME += 1;
+		  }
+		  if (HAL_GPIO_ReadPin(BTN5_GPIO_Port, BTN5_Pin) == 1 && BTN3_OK == 1 && EXPOSTION_TIME != 0) {
+			  EXPOSTION_TIME -= 1;
+		  }
+	  };
+	  if (BTN1_Left == 1) {
+		  lcd_put_cur(0, 0);
+		  lcd_send_string("<-    FIRE    ->");
+		  lcd_put_cur(1, 8);
+		  lcd_send_string(BTN1_Left_str);
+	  };
+	  /* ЭЛЕМЕНТЫ КРУГОВОГО МЕНЮ КОНЕЦ */
+
+	  HAL_Delay(150);
 	  lcd_clear();
     /* USER CODE BEGIN 3 */
   }
