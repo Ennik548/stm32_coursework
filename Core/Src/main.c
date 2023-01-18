@@ -41,6 +41,7 @@
 
 /* Private variables ---------------------------------------------------------*/
  I2C_HandleTypeDef hi2c1;
+ TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
 
@@ -50,13 +51,112 @@
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void delay (uint16_t us)
+{
+	__HAL_TIM_SET_COUNTER(&htim1, 0);
+	while (__HAL_TIM_GET_COUNTER(&htim1) < us);
+}
 
+#define stepsperrev 4096
+
+void stepper_set_rpm (int rpm)  // Set rpm--> max 13, min 1,,,  went to 14 rev/min
+{
+	delay(60000000/stepsperrev/rpm);
+}
+
+void stepper_half_drive (int step)
+{
+	switch (step){
+		case 0:
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+			break;
+
+		case 1:
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+			break;
+
+		case 2:
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+			break;
+
+		case 3:
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+			break;
+
+		case 4:
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+			break;
+
+		case 5:
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			break;
+
+		case 6:
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			break;
+
+		case 7:
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			break;
+		}
+}
+void stepper_step_angle (float angle, int direction, int rpm)
+{
+	float anglepersequence = 0.703125;
+	int numberofsequences = (int) (angle/anglepersequence);
+
+	for (int seq=0; seq<numberofsequences; seq++)
+	{
+		if (direction == 0)
+		{
+			for (int step=7; step>=0; step--)
+			{
+				stepper_half_drive(step);
+				stepper_set_rpm(rpm);
+			}
+		}
+
+		else if (direction == 1)
+		{
+			for (int step=0; step<8; step++)
+			{
+				stepper_half_drive(step);
+				stepper_set_rpm(rpm);
+			}
+		}
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -88,84 +188,131 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_TIM_Base_Start(&htim1);
   /* USER CODE END 2 */
   lcd_init();
   int BTN1_Left = 0;
   int BTN3_OK = 0;
   int EXPOSTION_TIME = 0;
-  char BTN1_Left_str[10];
+  int NUMBER_OF_SAMPLES = 0;
+  int FIRE = 0;
+
   char EXPOSTION_TIME_str[4];
-  char BTN3_OK_str[10];
+  char NUMBER_OF_SAMPLES_str[4];
+
   /* Infinite loop */
+  stepper_step_angle(80, 0, 12);
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
-	  /* ПЕРЕКЛЮЧЕНИЕ ПО МЕНЮ НАЧАЛО */
-	  if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 1) {
-		  BTN1_Left += 1;
-	  }
-	  else if (HAL_GPIO_ReadPin(BTN2_GPIO_Port, BTN2_Pin) == 1) {
-		  BTN1_Left -= 1;
-	  }
-	  /* ПЕРЕКЛЮЧЕНИЕ ПО МЕНЮ КОНЕЦ */
-	  /* КРУГОВОЕ МЕНЮ НАЧАЛО */
-	  if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 1 && BTN1_Left == 2) {
-		  BTN1_Left = 0; // НАСТРОЙКА ПРАВОЙ ГРАНИЦЫ
-	  };
-	  if (HAL_GPIO_ReadPin(BTN2_GPIO_Port, BTN2_Pin) == 1 && BTN1_Left == -1) {
-		  BTN1_Left = 1; // НАСТРОЙКА ЛЕВОЙ ГРАНИЦЫ
-	  };
-	  /* КРУГОВОЕ МЕНЮ КОНЕЦ */
+      /* USER CODE END WHILE */
+  	  /* ПЕРЕКЛЮЧЕНИЕ ПО МЕНЮ НАЧАЛО */
+  	  if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 1 && BTN3_OK == 0) {
+  		  BTN1_Left += 1;
+  	  }
+  	  else if (HAL_GPIO_ReadPin(BTN2_GPIO_Port, BTN2_Pin) == 1 && BTN3_OK == 0) {
+  		  BTN1_Left -= 1;
+  	  }
+  	  /* ПЕРЕКЛЮЧЕНИЕ ПО МЕНЮ КОНЕЦ */
+  	  /* КРУГОВОЕ МЕНЮ НАЧАЛО */
+  	  if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 1 && BTN1_Left == 3) {
+  		  BTN1_Left = 0; // НАСТРОЙКА ПРАВОЙ ГРАНИЦЫ
+  	  };
+  	  if (HAL_GPIO_ReadPin(BTN2_GPIO_Port, BTN2_Pin) == 1 && BTN1_Left == -1) {
+  		  BTN1_Left = 1; // НАСТРОЙКА ЛЕВОЙ ГРАНИЦЫ
+  	  };
+  	  /* КРУГОВОЕ МЕНЮ КОНЕЦ */
 
-	  /* ОБРАБОТКА ОК НАЧАЛО */
-	  if (HAL_GPIO_ReadPin(BTN3_GPIO_Port, BTN3_Pin) == 1) {
-	  		  BTN3_OK += 1;
-	  };
-	  if (HAL_GPIO_ReadPin(BTN3_GPIO_Port, BTN3_Pin) == 1 && BTN3_OK == 2) {
-	  		  BTN3_OK = 0;
-	  };
-	  /* ОБРАБОТКА ОК КОНЕЦ */
+  	  /* ОБРАБОТКА ОК НАЧАЛО */
+  	  if (HAL_GPIO_ReadPin(BTN3_GPIO_Port, BTN3_Pin) == 1) {
+  	  		  BTN3_OK += 1;
+  	  };
+  	  if (HAL_GPIO_ReadPin(BTN3_GPIO_Port, BTN3_Pin) == 1 && BTN3_OK == 2) {
+  	  		  BTN3_OK = 0;
+  	  };
+  	  /* ОБРАБОТКА ОК КОНЕЦ */
 
-	  /* ИНКРЕМЕНТАЦИЯ НАЧАЛО */
+  	  /* ИНКРЕМЕНТАЦИЯ НАЧАЛО */
 
 
-	  /* ИНКРЕМЕНТАЦИЯ КОНЕЦ */
-	  sprintf(BTN1_Left_str, "%d", BTN1_Left);
-	  sprintf(EXPOSTION_TIME_str, "%d", EXPOSTION_TIME);
-	  sprintf(BTN3_OK_str, "%d", BTN3_OK);
+  	  /* ИНКРЕМЕНТАЦИЯ КОНЕЦ */
+  	  sprintf(EXPOSTION_TIME_str, "%d", EXPOSTION_TIME);
+  	  sprintf(NUMBER_OF_SAMPLES_str, "%d", NUMBER_OF_SAMPLES);
 
-	  /* ЭЛЕМЕНТЫ КРУГОВОГО МЕНЮ НАЧАЛО */
-	  if (BTN1_Left == 0) {
-		  lcd_put_cur(0, 0);
-		  lcd_send_string("<- Exposition ->");
-		  lcd_put_cur(1, 0);
-		  lcd_send_string(BTN3_OK_str);
-		  lcd_put_cur(1, 8);
-		  lcd_send_string(EXPOSTION_TIME_str);
-		  if (HAL_GPIO_ReadPin(BTN4_GPIO_Port, BTN4_Pin) == 1 && BTN3_OK == 1 && EXPOSTION_TIME != 9999) {
-			  EXPOSTION_TIME += 1;
+
+  	  /* ЭЛЕМЕНТЫ КРУГОВОГО МЕНЮ НАЧАЛО */
+  	  if (BTN1_Left == 0) {
+  		  lcd_put_cur(0, 0);
+  		  lcd_send_string("<- Exposition ->");
+  		  lcd_put_cur(1, 8);
+  		  lcd_send_string(EXPOSTION_TIME_str);
+  		  if (HAL_GPIO_ReadPin(BTN4_GPIO_Port, BTN4_Pin) == 1 && BTN3_OK == 1 && EXPOSTION_TIME != 9999) {
+  			  EXPOSTION_TIME += 1;
+  		  };
+  		  if (HAL_GPIO_ReadPin(BTN5_GPIO_Port, BTN5_Pin) == 1 && BTN3_OK == 1 && EXPOSTION_TIME != 0) {
+  			  EXPOSTION_TIME -= 1;
+  		  };
+  	  };
+
+  	  if (BTN1_Left == 1) {
+  		  lcd_put_cur(0, 0);
+  		  lcd_send_string("<- N. Samples ->");
+  		  lcd_put_cur(1, 8);
+  		  lcd_send_string(NUMBER_OF_SAMPLES_str);
+  		  if (HAL_GPIO_ReadPin(BTN4_GPIO_Port, BTN4_Pin) == 1 && BTN3_OK == 1 && NUMBER_OF_SAMPLES != 9999) {
+  			  NUMBER_OF_SAMPLES += 1;
+  		  };
+  		  if (HAL_GPIO_ReadPin(BTN5_GPIO_Port, BTN5_Pin) == 1 && BTN3_OK == 1 && NUMBER_OF_SAMPLES != 0) {
+  			  NUMBER_OF_SAMPLES -= 1;
+  		  };
+  	  };
+  	  if (BTN1_Left == 2) {
+  		  	  if (BTN3_OK == 0 && FIRE == 0) {
+  	  		  	  lcd_put_cur(0, 0);
+  	  		  	  lcd_send_string("<-   FIRE ?   ->");
+  	  		  	  lcd_put_cur(1, 5);
+  	  		  	  lcd_send_string("YES");
+  	  		  	  lcd_put_cur(1, 8);
+  	  		  	  lcd_send_string("/");
+  	  		  	  lcd_put_cur(1, 9);
+  	  		  	  lcd_send_string("NO");
+  		  	  }
+  		  	  if (BTN3_OK == 1) {
+  		  		  if (FIRE == 0) {
+  		  		  	  lcd_put_cur(0, 0);
+  		  		  	  lcd_send_string("<-   FIRE ?   ->");
+  	  	  		  	  lcd_put_cur(1, 7);
+  	  	  		  	  lcd_send_string("NO");
+  		  		  }
+  		  		  else if (FIRE == 1) {
+  		  		  	  lcd_put_cur(0, 0);
+  		  		  	  lcd_send_string("<-   FIRE ?   ->");
+  	  	  		  	  lcd_put_cur(1, 6);
+  	  	  		  	  lcd_send_string("YES!");
+  		  		  }
+  	  		  	  if (HAL_GPIO_ReadPin(BTN4_GPIO_Port, BTN4_Pin) == 1 && FIRE != 1)  {
+  	  		  		  FIRE += 1;
+  	  		  	  }
+  	  		  	  else if (HAL_GPIO_ReadPin(BTN5_GPIO_Port, BTN5_Pin) == 1 && FIRE != 0) {
+  	  		  		  FIRE -= 1;
+  	  		  	  }
+  		  	  };
+		  if (FIRE == 1 && BTN3_OK == 0) {
+			  lcd_put_cur(0, 0);
+			  lcd_send_string("working....");
+
 		  }
-		  if (HAL_GPIO_ReadPin(BTN5_GPIO_Port, BTN5_Pin) == 1 && BTN3_OK == 1 && EXPOSTION_TIME != 0) {
-			  EXPOSTION_TIME -= 1;
-		  }
-	  };
-	  if (BTN1_Left == 1) {
-		  lcd_put_cur(0, 0);
-		  lcd_send_string("<-    FIRE    ->");
-		  lcd_put_cur(1, 8);
-		  lcd_send_string(BTN1_Left_str);
-	  };
-	  /* ЭЛЕМЕНТЫ КРУГОВОГО МЕНЮ КОНЕЦ */
+  	  };
+  	/* ЭЛЕМЕНТЫ КРУГОВОГО МЕНЮ КОНЕЦ */
 
-	  HAL_Delay(150);
-	  lcd_clear();
-    /* USER CODE BEGIN 3 */
+  	  HAL_Delay(150);
+  	  lcd_clear();
+      /* USER CODE BEGIN 3 */
+    }
+    /* USER CODE END 3 */
   }
-  /* USER CODE END 3 */
-}
 
 /**
   * @brief System Clock Configuration
@@ -241,6 +388,52 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 72-1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 65535;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -253,6 +446,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PA1 PA2 PA3 PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : BTN5_Pin BTN4_Pin BTN3_Pin BTN2_Pin
                            BTN1_Pin */
